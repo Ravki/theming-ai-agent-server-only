@@ -6,7 +6,7 @@ const path = require('path');
 const multer = require("multer");
 // const { updateColor, updateSpacing } = require('./themeLogic'); // Import your logic
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const submitHex = require('./controllers/color-algo');
 const formatColorMappings = require('./controllers/color-formatter');
 
