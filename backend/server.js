@@ -331,6 +331,16 @@ const runKMeansColorExtraction = async (imagePath, numColors = 5) => {
   }
 };
 
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    service: 'theming-ai-service',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
