@@ -19,6 +19,8 @@ const cors = require('cors');
 // const readmeContent = fs.readFileSync(readmePath, 'utf-8');
 const readmePath = path.join(__dirname, 'controllers/STYLINGHOOKS.md');
 
+const fs = require('fs');
+
 app.use(express.json());
 // app.use(cors({
 //   origin: 'http://localhost:3000', // URL of your React app
@@ -330,6 +332,45 @@ const runKMeansColorExtraction = async (imagePath, numColors = 5) => {
     return [];
   }
 };
+
+app.post('/api/text2audio', async (req, res) => {
+  const { message } = req.body;
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'Message is required and must be a string.' });
+  }
+
+  try {
+    // Call OpenAI TTS API
+    const ttsResponse = await axios.post(
+      'https://api.openai.com/v1/audio/speech',
+      {
+        model: 'tts-1',
+        input: message,
+        voice: 'alloy', // You can change the voice if you want
+        response_format: 'mp3'
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        responseType: 'arraybuffer'
+      }
+    );
+
+    // Save the audio file
+    const audioFileName = `text2audio_${Date.now()}.mp3`;
+    const audioFilePath = path.join(__dirname, '../uploads', audioFileName);
+    fs.writeFileSync(audioFilePath, Buffer.from(ttsResponse.data));
+
+    // Return the public URL
+    const audioUrl = `${req.protocol}://${req.get('host')}/uploads/${audioFileName}`;
+    res.json({ audio: audioUrl });
+  } catch (error) {
+    console.error('TTS Error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to generate audio.' });
+  }
+});
 
 // Health check endpoint
 app.get('/', (req, res) => {
