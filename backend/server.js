@@ -333,6 +333,32 @@ const runKMeansColorExtraction = async (imagePath, numColors = 5) => {
   }
 };
 
+function sanitizeText(text) {
+  // Remove problematic characters (example: brackets, excessive whitespace)
+  return text.replace(/[\[\]\(\)]/g, '').trim();
+}
+
+// Helper function to translate any text to English using OpenAI
+async function translateToEnglishWithOpenAI(text) {
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: 'You are a translation assistant.' },
+        { role: 'user', content: `Translate this to English: ${text}` }
+      ]
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  return response.data.choices[0].message.content.trim();
+}
+
 app.post('/api/text2audio', async (req, res) => {
   const { message } = req.body;
   if (!message || typeof message !== 'string') {
@@ -340,13 +366,16 @@ app.post('/api/text2audio', async (req, res) => {
   }
 
   try {
-    // Call OpenAI TTS API
+    // Translate to English using OpenAI
+    const translatedMessage = await translateToEnglishWithOpenAI(message);
+
+    // Call OpenAI TTS API with the translated message
     const ttsResponse = await axios.post(
       'https://api.openai.com/v1/audio/speech',
       {
         model: 'tts-1',
-        input: message,
-        voice: 'alloy', // You can change the voice if you want
+        input: translatedMessage,
+        voice: 'alloy',
         response_format: 'mp3'
       },
       {
@@ -363,12 +392,13 @@ app.post('/api/text2audio', async (req, res) => {
     const audioFilePath = path.join(__dirname, '../uploads', audioFileName);
     fs.writeFileSync(audioFilePath, Buffer.from(ttsResponse.data));
 
-    // Return the public URL
+    // Return the public URL and translated text
     const audioUrl = `${req.protocol}://${req.get('host')}/uploads/${audioFileName}`;
-    res.json({ audio: audioUrl });
+    res.json({ audio: audioUrl, translated: translatedMessage });
   } catch (error) {
-    console.error('TTS Error:', error.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to generate audio.' });
+    const apiError = error.response?.data?.error?.message || error.message;
+    console.error('TTS/Translation Error:', apiError);
+    res.status(500).json({ error: 'Failed to generate audio.', details: apiError });
   }
 });
 
