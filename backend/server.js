@@ -359,25 +359,38 @@ async function translateToLanguageWithOpenAI(text, language) {
   return response.data.choices[0].message.content.trim();
 }
 
-app.post('/api/text2audio', async (req, res) => {
+// Translation endpoint
+app.post('/api/translate', async (req, res) => {
   const { message, language } = req.body;
   if (!message || typeof message !== 'string') {
-    return res.status(400).json({ error: 'Message is required and must be a string.' });
+    return res.status(400).send('Message is required and must be a string.');
   }
   if (!language || typeof language !== 'string') {
-    return res.status(400).json({ error: 'Language is required and must be a string.' });
+    return res.status(400).send('Language is required and must be a string.');
   }
-
   try {
-    // Translate to the target language using OpenAI
     const translatedMessage = await translateToLanguageWithOpenAI(message, language);
+    res.type('text/plain').send(translatedMessage);
+  } catch (error) {
+    const apiError = error.response?.data?.error?.message || error.message;
+    console.error('Translation Error:', apiError);
+    res.status(500).send('Failed to translate message.');
+  }
+});
 
-    // Call OpenAI TTS API with the translated message
+// Text-to-audio endpoint
+app.post('/api/text2audio', async (req, res) => {
+  const { message } = req.body;
+  if (!message || typeof message !== 'string') {
+    return res.status(400).send('Message is required and must be a string.');
+  }
+  try {
+    // Call OpenAI TTS API with the message
     const ttsResponse = await axios.post(
       'https://api.openai.com/v1/audio/speech',
       {
         model: 'tts-1',
-        input: translatedMessage,
+        input: message,
         voice: 'alloy',
         response_format: 'mp3'
       },
@@ -389,19 +402,17 @@ app.post('/api/text2audio', async (req, res) => {
         responseType: 'arraybuffer'
       }
     );
-
     // Save the audio file
     const audioFileName = `text2audio_${Date.now()}.mp3`;
     const audioFilePath = path.join(__dirname, '../uploads', audioFileName);
     fs.writeFileSync(audioFilePath, Buffer.from(ttsResponse.data));
-
-    // Return the public URL and translated text
+    // Return the public URL as a plain string
     const audioUrl = `${req.protocol}://${req.get('host')}/uploads/${audioFileName}`;
-    res.json({ audio: audioUrl, translated: translatedMessage });
+    res.type('text/plain').send(audioUrl);
   } catch (error) {
     const apiError = error.response?.data?.error?.message || error.message;
-    console.error('TTS/Translation Error:', apiError);
-    res.status(500).json({ error: 'Failed to generate audio.', details: apiError });
+    console.error('TTS Error:', apiError);
+    res.status(500).send('Failed to generate audio.');
   }
 });
 
