@@ -338,15 +338,15 @@ function sanitizeText(text) {
   return text.replace(/[\[\]\(\)]/g, '').trim();
 }
 
-// Helper function to translate any text to English using OpenAI
-async function translateToEnglishWithOpenAI(text) {
+// Helper function to translate any text to a target language using OpenAI
+async function translateToLanguageWithOpenAI(text, language) {
   const response = await axios.post(
     'https://api.openai.com/v1/chat/completions',
     {
       model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: 'You are a translation assistant.' },
-        { role: 'user', content: `Translate this to English: ${text}` }
+        { role: 'user', content: `Translate this to ${language}: ${text}` }
       ]
     },
     {
@@ -360,14 +360,17 @@ async function translateToEnglishWithOpenAI(text) {
 }
 
 app.post('/api/text2audio', async (req, res) => {
-  const { message } = req.body;
+  const { message, language } = req.body;
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'Message is required and must be a string.' });
   }
+  if (!language || typeof language !== 'string') {
+    return res.status(400).json({ error: 'Language is required and must be a string.' });
+  }
 
   try {
-    // Translate to English using OpenAI
-    const translatedMessage = await translateToEnglishWithOpenAI(message);
+    // Translate to the target language using OpenAI
+    const translatedMessage = await translateToLanguageWithOpenAI(message, language);
 
     // Call OpenAI TTS API with the translated message
     const ttsResponse = await axios.post(
