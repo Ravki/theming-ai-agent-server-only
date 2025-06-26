@@ -416,6 +416,49 @@ app.post('/api/text2audio', async (req, res) => {
   }
 });
 
+// Translate and generate audio in one step
+app.post('/api/translate2audio', async (req, res) => {
+  const { message, language } = req.body;
+  if (!message || typeof message !== 'string') {
+    return res.status(400).send('Message is required and must be a string.');
+  }
+  if (!language || typeof language !== 'string') {
+    return res.status(400).send('Language is required and must be a string.');
+  }
+  try {
+    // Translate to the target language using OpenAI
+    const translatedMessage = await translateToLanguageWithOpenAI(message, language);
+    // Call OpenAI TTS API with the translated message
+    const ttsResponse = await axios.post(
+      'https://api.openai.com/v1/audio/speech',
+      {
+        model: 'tts-1',
+        input: translatedMessage,
+        voice: 'alloy',
+        response_format: 'mp3'
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        responseType: 'arraybuffer'
+      }
+    );
+    // Save the audio file
+    const audioFileName = `text2audio_${Date.now()}.mp3`;
+    const audioFilePath = path.join(__dirname, '../uploads', audioFileName);
+    fs.writeFileSync(audioFilePath, Buffer.from(ttsResponse.data));
+    // Return the public URL as a plain string
+    const audioUrl = `${req.protocol}://${req.get('host')}/uploads/${audioFileName}`;
+    res.type('text/plain').send(audioUrl);
+  } catch (error) {
+    const apiError = error.response?.data?.error?.message || error.message;
+    console.error('Translate2Audio Error:', apiError);
+    res.status(500).send('Failed to translate and generate audio.');
+  }
+});
+
 // Health check endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
